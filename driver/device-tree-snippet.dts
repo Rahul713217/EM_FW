@@ -1,0 +1,13 @@
+beamformer0: adar1000@0 {
+    compatible = "adi,adar1000";
+    reg = <0>;                      /* SPI chip select 0 */
+    spi-max-frequency = <15000000>; /* 15 MHz spi frequency I take */
+
+    /* Optional */
+    /*spi-cpol = <0>;*/
+    /*spi-cpha = <1>;*/
+
+	/*phandle = <0x54>;*/
+};
+
+
