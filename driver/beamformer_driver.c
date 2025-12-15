@@ -134,7 +134,7 @@ int bf_set_phase(int channel, int degree)
     if (channel < 0 || channel >= NUM_CHANNELS)
         return FAILURE;
 
-    if (degree < 0 || degree >= 360)
+    if (degree < 0 || degree > 360)
         return FAILURE;
 
     uint32_t regIAddr = 0;
@@ -205,7 +205,7 @@ int bf_set_gain(int channel, int gain)
     uint32_t gainRegAddr = 0;
 
     printf("channel - %d, gain %02x\n", channel, gain);
-    
+
     gainRegAddr = ADAR1000_RX_GAIN(channel);
     if (writeRegister(gainRegAddr,(uint8_t)gain) != SUCCESS)
         return FAILURE;
