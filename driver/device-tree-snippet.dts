@@ -1,3 +1,6 @@
+
+
+
 beamformer0: adar1000@0 {
     compatible = "adi,adar1000";
     reg = <0>;                      /* SPI chip select 0 */

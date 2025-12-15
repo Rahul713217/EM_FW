@@ -57,8 +57,8 @@ int main(int argc, char *argv[])
             print_usage(argv[0]);
             return -1;
         }
-        // int angle = atoi(argv[2]);
-        float angle = atoi(argv[2]);
+        int angle = atoi(argv[2]);
+        // float angle = atoi(argv[2]);
         ret = bf_set_beam_angle(angle);
         if (ret)
             fprintf(stderr, "bf_set_beam_angle failed\n");

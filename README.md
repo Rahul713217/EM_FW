@@ -1,8 +1,7 @@
-# Beamformer Driver Assignment
+# Beamformer Driver
 
 ## IC Selected
 **ADAR1000** – 4-channel RF beamformer IC with SPI control.
-
 
 ## Driver Overview
 User-space C driver providing APIs to:
@@ -21,11 +20,16 @@ User-space C driver providing APIs to:
 | `bf_deinit()` | Reset IC and disabled SDO |
 | `bf_set_phase(channel, degree)` | Set channel phase |
 | `bf_set_gain(channel, gain)` | Set channel gain (dB) |
-| `bf_set_beam_angle(angle)` | Compute per-channel phases for desired beam angle |
+| `bf_set_beam_angle(angle)` | Convert angle into per-channel phases |
 
-## Beam-angle → Phase Logic
-1. Compute phase shift:  
-   `phase_shift = (2 * π * frequency * d / c) * sin(angle)`  
+## angle → Phase Logic
+1. Compute phase:  
+   `θ(rad) = angle_degree × π / 180`
+   `Δφ = 180 × sin(θ)`
+
 2. Apply relative phase per channel:  
-   `channel_phase = index * phase_shift`  
+   `phase(ch) = ch × Δφ`  
 3. Map to register I/Q values using `ADAR1000_PHASEMAP`.
+
+## Execute the command
+ `gcc -o beamctl beamctl.c beamformer_driver.c`

@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include "beamformer_driver.h"
@@ -13,9 +14,8 @@
 #define ADAR1000_TX_PHASE_Q(channel) (0x021 + 2 * (channel))
 
 #define DIVISION_FACTOR (2.8125f)
-#define RF_FREQUENCY 9.5e9 // 9.5GHz
-#define ELEMENT_SPACING 0.5f
 #define NUM_CHANNELS 4
+
 #define SUCCESS 0
 #define FAILURE -1
 
@@ -36,19 +36,21 @@ static const struct Phase_s g_PhaseMap[128] = ADAR1000_PHASEMAP;
 // };
 // MODULE_DEVICE_TABLE(of, adar1000_of_match);
 
-static int writeRegister(uint32_t addr, uint8_t data) {
-    //SPI write
+static int writeRegister(uint32_t addr, uint8_t data)
+{
+    // SPI write
     return SUCCESS;
 } // need to implement
 
-static int readRegister(uint32_t addr, uint8_t *data) {
-    //SPI read
+static int readRegister(uint32_t addr, uint8_t *data)
+{
+    // SPI read
     return SUCCESS;
 } // need to implement
 
 int bf_init(void)
 {
-    // datasheet page 50
+    //as per datasheet page 50
     writeRegister(0x000, 0xBD); // Reset whole chip, enable SDO readback
     writeRegister(0x000, 0x18); // SDO Enable All chips
 
@@ -127,38 +129,52 @@ int bf_init(void)
     return 0;
 }
 
-int bf_set_phase(int channel, int phsIdx)
+int bf_set_phase(int channel, int degree)
 {
     if (channel < 0 || channel >= NUM_CHANNELS)
         return FAILURE;
 
-    if (phsIdx < 0 || phsIdx >= 128)
+    if (degree < 0 || degree >= 360)
         return FAILURE;
 
     uint32_t regIAddr = 0;
     uint32_t regQAddr = 0;
     // uint8_t phsIdx = 0;
+    uint8_t regI = 0, regQ = 0;
 
-    // uint8_t l = 0, r = 127;
-    // while (l <= r)
-    // {
-    //     uint8_t m = (l + r) >> 1;
-    //     if (degree == g_PhaseMap[m].integerPart)
-    //     {
-    //         regI = g_PhaseMap[m].regI_t;
-    //         regQ = g_PhaseMap[m].regQ_t;
-    //     }
-    //     if (degree < g_PhaseMap[m].integerPart)
-    //     {
-    //         r = m - 1;
-    //     }
-    //     else
-    //     {
-    //         l = m + 1;
-    //     }
-    // }
+    uint8_t l = 0, r = 127;
+    while (l <= r)
+    {
+        uint8_t m = (l + r) >> 1;
+        if (degree == g_PhaseMap[m].integerPart)
+        {
+            regI = g_PhaseMap[m].regI_t;
+            regQ = g_PhaseMap[m].regQ_t;
+        }
+        if (degree < g_PhaseMap[m].integerPart)
+        {
+            r = m - 1;
+        }
+        else
+        {
+            l = m + 1;
+        }
+    }
 
-    uint8_t regI = g_PhaseMap[phsIdx].regI_t, regQ = g_PhaseMap[phsIdx].regQ_t;
+    int prev_val = g_PhaseMap[r].integerPart;
+    int next_val = g_PhaseMap[l].integerPart;
+
+    printf("prev %d, curr %d, next %d\n", prev_val, degree, next_val);
+    if (fabs(degree - prev_val) < fabs(degree - next_val))
+    {
+        regI = g_PhaseMap[r].regI_t, regQ = g_PhaseMap[r].regQ_t; // If not found, return the next higher phase I & Q
+    }
+    else
+    {
+        regI = g_PhaseMap[l].regI_t, regQ = g_PhaseMap[l].regQ_t; // If not found, return the previous lower phase I & Q
+    }
+
+    printf("regI - %02x, regQ - %02x\n", regI, regQ);
 
     // for both RX and TX directions
     regIAddr = ADAR1000_RX_PHASE_I(channel);
@@ -172,7 +188,7 @@ int bf_set_phase(int channel, int phsIdx)
     regQAddr = ADAR1000_TX_PHASE_Q(channel);
     if (writeRegister(regIAddr, regI) != SUCCESS)
         return FAILURE;
-    if (writeRegister(regQAddr, regQ)!=SUCCESS)
+    if (writeRegister(regQAddr, regQ) != SUCCESS)
         return FAILURE;
 
     return 0;
@@ -182,48 +198,55 @@ int bf_set_gain(int channel, int gain)
 {
     if (gain < 0 || gain > 0xFF)
         return FAILURE;
-    if (channel < 0 || channel >= NUM_CHANNELS){
+    if (channel < 0 || channel >= NUM_CHANNELS)
+    {
         return FAILURE;
     }
     uint32_t gainRegAddr = 0;
 
+    printf("channel - %d, gain %02x\n", channel, gain);
+    
     gainRegAddr = ADAR1000_RX_GAIN(channel);
-    if (writeRegister(gainRegAddr, gain)!=SUCCESS)
+    if (writeRegister(gainRegAddr,(uint8_t)gain) != SUCCESS)
         return FAILURE;
     gainRegAddr = ADAR1000_TX_GAIN(channel);
-    if (writeRegister(gainRegAddr, gain)!=SUCCESS)
+    if (writeRegister(gainRegAddr,(uint8_t)gain) != SUCCESS)
         return FAILURE;
 
     return 0;
 }
 
-int bf_set_beam_angle(float angle_degree)
+int bf_set_beam_angle(int angle_degree)
 {
-    float phase = 0.0f;
-    float phsIdx_float = 0.0f;
-    int phsIdx = 0;
+    // float phsIdx_float = 0.0f;
+    // int phsIdx = 0;
+    int phase_deg = 0;
+    float theta_rad = 0.0f, delta_phase_deg = 0.0f;
 
-    if (angle_degree < 0.0f)
-        angle_degree = 0.0f;
-    if (angle_degree > 360.0f)
-        angle_degree = 360.0f;
+    printf("angle_degree - %d\n", angle_degree);
 
-    float phsFactor = (2.0 * 180.0 * RF_FREQUENCY * ELEMENT_SPACING) / 3e8; // (2*pi*f) * d / c
-    float phase_shift = phsFactor * sin(angle_degree * (3.14159265f / 180.0f));
+    if (angle_degree < -90 || angle_degree > 90)
+        return -1;
 
-    for (int ch = 0; ch < NUM_CHANNELS; ++ch)
+    theta_rad = (float)angle_degree * (3.1415926536f / 180.0f);
+    delta_phase_deg = 180.0f * sinf(theta_rad);
+
+    for (int ch = 0; ch < NUM_CHANNELS; ch++)
     {
-        phase = ch * phase_shift;
-        phsIdx_float = phase / DIVISION_FACTOR; // 2.8125; // convert to 0-127 range
+        phase_deg = (int)(ch * delta_phase_deg);
 
-        uint32_t int_part = (uint32_t)phsIdx_float;
-        float frac_part = phsIdx_float - int_part;
-        phsIdx = (frac_part > 0.5) ? (int_part + 1) : int_part;
-
-        if (bf_set_phase(ch, phsIdx) != SUCCESS)
-            return FAILURE;
+        if (phase_deg < 0)
+            phase_deg += 360;
+        if (phase_deg >= 360)
+            phase_deg %= 360;
+        printf("phase_deg - %d, channel_no - %d\n", phase_deg, ch);
+        bf_set_phase(ch, phase_deg);
     }
 
+    // phsIdx_float = angle_degree / DIVISION_FACTOR; // 2.8125; // convert to 0-127 range
+    // uint32_t int_part = (uint32_t)phsIdx_float;
+    // float frac_part = phsIdx_float - int_part;
+    // phsIdx = (frac_part > 0.5) ? (int_part + 1) : int_part;
     return 0;
 }
 

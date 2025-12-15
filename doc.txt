@@ -1,0 +1,3 @@
+Any external resources or tools used. -> ADI github page for the driver and datasheet of adar1000 
+Reasoning behind design choices.  -> designed as per the assignment
+Challenges faced and how they were solved. -> mapping phase to degree is challenging in minimal time, used binary search approach
